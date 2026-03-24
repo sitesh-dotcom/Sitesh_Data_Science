@@ -1,2 +1,3 @@
 remote add origin https://github.com/sitesh-dotcom/Sitesh_Data_Science.git
-
+git add .
+git commit -m
