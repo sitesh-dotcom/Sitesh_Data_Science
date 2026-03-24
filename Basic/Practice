@@ -1,3 +1,5 @@
-remote add origin https://github.com/sitesh-dotcom/Sitesh_Data_Science.git
-git add .
-git commit -m
+# num1 = 100
+# num2 = 200
+add = num1 + num2
+print(addition :",add)
+
