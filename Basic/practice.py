@@ -23,5 +23,9 @@ flag1 = age > 18
 print(flag1)
 numbers = [100,200,300,400,500]
 print(numbers[0],numbers[-5])
+print(type(numbers))
+numbers[0] = 111
+print(numbers)
+
 
 
