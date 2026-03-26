@@ -26,6 +26,34 @@ print(numbers[0],numbers[-5])
 print(type(numbers))
 numbers[0] = 111
 print(numbers)
+import pandas as pd
+import numpy as np
+
+# Create a small dataset to test
+data = {
+    'Name': ['Alice', 'Bob', 'Charlie'],
+    'Score': [85, 92, 78]
+}
+
+df = pd.DataFrame(data)
+
+print("--- Data Science Environment Active ---")
+print(df)
+print("\nAverage Score:", df['Score'].mean())
+import seaborn as sns
+import pandas as pd
+
+# Load the classic Titanic dataset
+df = sns.load_dataset('titanic')
+
+# Display the first 5 rows
+print("--- Titanic Dataset Loaded ---")
+print(df.head())
+
+# Quick Analysis: What was the survival rate by gender?
+print("\nSurvival Rate by Gender:")
+print(df.groupby('sex')['survived'].mean())
+
 
 
 
