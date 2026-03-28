@@ -53,7 +53,9 @@ print(df.head())
 # Quick Analysis: What was the survival rate by gender?
 print("\nSurvival Rate by Gender:")
 print(df.groupby('sex')['survived'].mean())
-
+x = 2323
+y = 2323
+print(x is y)
 
 
 
