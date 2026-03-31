@@ -19,6 +19,40 @@ info = {
 }
 print(info)
 print(info["name"])
+print(10*5)
+# this is my code
+print("Rahul is a \"good boy\"\nand Gopi is also a good boy")
+# This will print like this
+# Rahul is a "good boy"
+# and Gopi is also a good boy
+print(5%3)
+print(15//6)
+print(2**4)
+a = 25
+b = 3
+c = 5
+      
+print("The value of", a, "+", b, "is: ", a + b)
+print("The value of", a, "-", b, "is: ", a - b)
+print("The value of", a, "*", b, "is: ", a * b)
+print("The value of", a, "/", b, "is: ", a / b)
+a = input("My name is Sidhi :")
+print("my name is Sitesh", a)
+x = input("please enter first number :")
+y = input("please enter second number :")
+print(x + y)
+print(int(x) + int(y))
+# print(str)
+nm = "Harry"
+print(nm[-4:-2])
+a, b = 5, 10
+print("Before swaping: a =", a, "b =", b)
+a, b = b, a
+print("After swaping: a =", a, "b =", b)
+
+
+
+
 
 
 
