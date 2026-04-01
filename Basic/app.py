@@ -53,7 +53,7 @@ if st.button("Update Market Data", key="final_update_btn"):
         # Prediction Logic
         # --- NEW DATA LOGIC ---
 # Fetch data
-        data = yf.download(ticker, period=period, interval='5m' if period == '1d' else '1d')
+        data = yf.download(ticker, selected_period, interval='5m' if period == '1d' else '1d')
 
 if not data.empty:
     # Only runs if the market returned actual prices
