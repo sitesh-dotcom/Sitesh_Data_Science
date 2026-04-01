@@ -97,3 +97,5 @@ if st.button("Update Market Data", key="final_update_btn"):
 
     else:
         st.error("No data found. Check your selection.")
+        # This moves the file "up" one level to the main project folder
+        
