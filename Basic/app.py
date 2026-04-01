@@ -1,118 +1,92 @@
-import pandas as pd
 import streamlit as st
 import yfinance as yf
-import plotly.graph_objects as go
-from sklearn.linear_model import LinearRegression
-import numpy as np
+import pandas as pd
 
-# 1. INITIALIZE SETTINGS
-st.set_page_config(page_title="Sitesh's Market Dashboard", layout="wide")
+# -------------------------------
+# Page Config
+# -------------------------------
+st.set_page_config(page_title="Global Market Dashboard", layout="wide")
 
-# 2. SIDEBAR SETUP
-st.sidebar.header("Settings")
-market_display = st.sidebar.selectbox(
-    "Select Index", 
-    ["Dow Jones (^DJI)", "Nifty 50 (^NSEI)", "Bitcoin (BTC-USD)"],
-    key="main_market_select"
-)
-
-time_range = st.sidebar.selectbox(
-    "Select Period", 
-    ["1d", "5d", "1mo", "6mo"],
-    key="main_period_select"
-)
-
-ticker_map = {
-    "Dow Jones (^DJI)": "^DJI", 
-    "Nifty 50 (^NSEI)": "^NSEI", 
-    "Bitcoin (BTC-USD)": "BTC-USD"
-}
-selected_ticker = ticker_map[market_display]
-
-# 3. MAIN DASHBOARD UI
 st.title("📈 Sitesh's Global Market Dashboard")
 
-if st.button("Update Market Data", key="final_update_btn"):
-    with st.spinner('Analyzing market trends...'):
-        interval = "15m" if time_range == "1d" else "1h"
-        data = yf.download(selected_ticker, period=time_range, interval=interval)
+# -------------------------------
+# Sidebar Settings
+# -------------------------------
+st.sidebar.header("Settings")
 
-    if not data.empty:
-        # --- STEP 1: CALCULATIONS ---
-        # Moving Averages
-        data['SMA_20'] = data['Close'].rolling(window=20).mean()
-        data['SMA_50'] = data['Close'].rolling(window=50).mean()
+index_options = {
+    "Dow Jones (^DJI)": "^DJI",
+    "S&P 500 (^GSPC)": "^GSPC",
+    "NASDAQ (^IXIC)": "^IXIC",
+    "NIFTY 50 (^NSEI)": "^NSEI",
+    "BANK NIFTY (^NSEBANK)": "^NSEBANK"
+}
 
-        # RSI Calculation
-        delta = data['Close'].diff()
-        gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
-        loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
-        rs = gain / loss
-        data['RSI'] = 100 - (100 / (1+rs))
+selected_index = st.sidebar.selectbox("Select Index", list(index_options.keys()))
+selected_symbol = index_options[selected_index]
 
-        # Prediction Logic
-        # --- NEW DATA LOGIC ---
-# Fetch data
-        data = yf.download(ticker, selected_period, interval='5m' if period == '1d' else '1d')
+period = st.sidebar.selectbox("Select Period", ["1d", "5d", "1mo", "3mo", "6mo", "1y"])
 
-if not data.empty:
-    # Only runs if the market returned actual prices
-    current_val = float(data['Close'].iloc[-1])
-    prev_val = float(data['Close'].iloc[0])
-    
-    # Calculate changes for your metrics
-    change = current_val - prev_val
-    percent_change = (change / prev_val) * 100
+# -------------------------------
+# Fetch Data Button
+# -------------------------------
+if st.button("Update Market Data"):
 
-    # Display the metric at the top
-    col1.metric(ticker, f"{current_val:,.2f}", f"{percent_change:+.2f}%")
-    
-    # Prediction logic (existing code moves inside this block)
-    data_for_model = data.dropna().copy()
-    # ... rest of your model code ...
-else:
-    st.warning(f"No data available for {ticker} right now. The market might be closed.")
-        if len(data_for_model) > 1:
-            data_for_model['Seconds'] = np.arange(len(data_for_model))
-            X = data_for_model[['Seconds']]
-            y = data_for_model['Close']
-            model = LinearRegression()
-            model.fit(X, y)
-            next_index = np.array([[len(data_for_model) + 1]])
-            pred_val = float(prediction.item())
-            prediction = model.predict(next_index)
-            
+    with st.spinner("Fetching data..."):
 
-        # --- STEP 2: CREATE THE UI CONTAINERS (Fixes NameError) ---
-        col1, col2, col3 = st.columns(3)
-        
-        # --- STEP 3: FILL THE METRICS ---
-        change = current_val - float(data['Open'].iloc[0])
-        col1.metric("Current Price", f"{float(current_val):,.2f}", f"{float(change):,.2f}")
-        rsi_val = data['RSI'].iloc[-1]
-        col2.metric("RSI (14)", f"{rsi_val:,.2f}")
-        
-        if pred_val is not None:
-            if pred_val > current_val:
-                col3.success(f"Prediction: 📈 {pred_val:,.2f}")
-            else:
-                col3.warning(f"Prediction: 📉 {pred_val:,.2f}")
-        else:
-            col3.info("Awaiting data...")
+        try:
+            # Fetch data
+            data = yf.download(selected_symbol, period=period, interval="1m")
 
-        # --- STEP 4: CREATE AND SHOW CHART ---
-        fig = go.Figure(data=[go.Candlestick(
-            x=data.index, open=data['Open'], high=data['High'],
-            low=data['Low'], close=data['Close'], name="Price"
-        )])
-        
-        fig.add_trace(go.Scatter(x=data.index, y=data['SMA_20'], name='20 SMA', line=dict(color='orange')))
-        fig.add_trace(go.Scatter(x=data.index, y=data['SMA_50'], name='50 SMA', line=dict(color='blue')))
-        
-        fig.update_layout(height=600, template="plotly_dark", xaxis_rangeslider_visible=False)
-        st.plotly_chart(fig, use_container_width=True)
+            # -------------------------------
+            # ERROR HANDLING
+            # -------------------------------
+            if data.empty:
+                st.error("❌ No data fetched. Market might be closed or symbol issue.")
+                st.stop()
 
-    else:
-        st.error("No data found. Check your selection.")
-        # This moves the file "up" one level to the main project folder
-        
+            if 'Close' not in data.columns:
+                st.error("❌ 'Close' column not found in data.")
+                st.stop()
+
+            # Clean data
+            data = data.dropna()
+
+            if data.empty:
+                st.error("❌ Data contains only NaN values.")
+                st.stop()
+
+            # -------------------------------
+            # SAFE VALUE EXTRACTION
+            # -------------------------------
+            current_val = float(data['Close'].iloc[-1])
+            prev_val = float(data['Close'].iloc[-2]) if len(data) > 1 else current_val
+
+            change = current_val - prev_val
+            percent_change = (change / prev_val) * 100 if prev_val != 0 else 0
+
+            # -------------------------------
+            # DISPLAY METRICS
+            # -------------------------------
+            st.subheader(f"{selected_index}")
+
+            col1, col2, col3 = st.columns(3)
+
+            col1.metric("Current Value", f"{current_val:.2f}")
+            col2.metric("Change", f"{change:.2f}")
+            col3.metric("Change %", f"{percent_change:.2f}%")
+
+            # -------------------------------
+            # CHART
+            # -------------------------------
+            st.line_chart(data['Close'])
+
+            # -------------------------------
+            # DEBUG (Optional)
+            # -------------------------------
+            with st.expander("Show Raw Data"):
+                st.write(data.tail())
+
+        except Exception as e:
+            st.error(f"⚠️ Error occurred: {e}")
+            st.stop()
