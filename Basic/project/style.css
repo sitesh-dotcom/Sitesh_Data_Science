@@ -1,0 +1,36 @@
+
+<style>
+  /* This CSS creates the sidebar container */
+  .sidebar {
+    width: 200px;
+    background-color: #1e293b; /* Dark background from your image */
+    padding: 20px;
+    height: 100vh;
+  }
+
+  /* This styles the individual bars */
+  .nav-item {
+    display: block;
+    padding: 12px;
+    margin-bottom: 10px;
+    border-radius: 8px; /* Makes it rounded */
+    color: white;
+    text-decoration: none;
+    font-family: sans-serif;
+  }
+
+  /* The specific colors from your screenshot */
+  .blue   { background-color: #5c7cfa; }
+  .green  { background-color: #20c997; }
+  .yellow { background-color: #fab005; }
+  .red    { background-color: #fa5252; }
+  .purple { background-color: #7950f2; border: 2px solid white; }
+</style>
+
+<div class="sidebar">
+  <a href="#" class="nav-item blue">💬 Ask AI</a>
+  <a href="#" class="nav-item green">✈️ Travel Guide</a>
+  <a href="#" class="nav-item yellow">🖼️ Image Generator</a>
+  <a href="#" class="nav-item red">📧 Email Writer</a>
+  <a href="#" class="nav-item purple">📄 Resume Builder</a>
+</div>

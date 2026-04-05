@@ -88,5 +88,5 @@ if st.button("Update Market Data"):
                 st.write(data.tail())
 
         except Exception as e:
-            st.error(f"⚠️ Error occurred: {e}")
+            st.error(f"Error occurred: {e}")
             st.stop()
