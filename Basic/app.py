@@ -1,16 +1,18 @@
 import streamlit as st
 import yfinance as yf
 import pandas as pd
+import plotly.graph_objects as go
+import time
 
 # -------------------------------
-# Page Config
+# PAGE CONFIG
 # -------------------------------
 st.set_page_config(page_title="Global Market Dashboard", layout="wide")
 
 st.title("📈 Sitesh's Global Market Dashboard")
 
 # -------------------------------
-# Sidebar Settings
+# SIDEBAR SETTINGS
 # -------------------------------
 st.sidebar.header("Settings")
 
@@ -23,70 +25,106 @@ index_options = {
 }
 
 selected_index = st.sidebar.selectbox("Select Index", list(index_options.keys()))
-selected_symbol = index_options[selected_index]
+symbol = index_options[selected_index]
 
-period = st.sidebar.selectbox("Select Period", ["1d", "5d", "1mo", "3mo", "6mo", "1y"])
+period = st.sidebar.selectbox("Select Period", ["1d", "5d", "1mo"])
+
+auto_refresh = st.sidebar.checkbox("Enable Auto Refresh (10 sec)", value=False)
 
 # -------------------------------
-# Fetch Data Button
+# AUTO REFRESH LOGIC
 # -------------------------------
-if st.button("Update Market Data"):
+if auto_refresh:
+    time.sleep(10)
+    st.rerun()
 
-    with st.spinner("Fetching data..."):
+# -------------------------------
+# FETCH DATA FUNCTION
+# -------------------------------
+@st.cache_data(ttl=60)
+def fetch_data(symbol, period):
+    data = yf.download(symbol, period=period, interval="1m")
+    return data
 
-        try:
-            # Fetch data
-            data = yf.download(selected_symbol, period=period, interval="1m")
+# -------------------------------
+# LOAD DATA
+# -------------------------------
+with st.spinner("Fetching market data..."):
+    data = fetch_data(symbol, period)
 
-            # -------------------------------
-            # ERROR HANDLING
-            # -------------------------------
-            if data.empty:
-                st.error("❌ No data fetched. Market might be closed or symbol issue.")
-                st.stop()
+# -------------------------------
+# ERROR HANDLING
+# -------------------------------
+if data.empty:
+    st.error("❌ No data fetched. Market may be closed.")
+    st.stop()
 
-            if 'Close' not in data.columns:
-                st.error("❌ 'Close' column not found in data.")
-                st.stop()
+if 'Close' not in data.columns:
+    st.error("❌ 'Close' column missing.")
+    st.stop()
 
-            # Clean data
-            data = data.dropna()
+# -------------------------------
+# FIX SERIES ISSUE (IMPORTANT)
+# -------------------------------
+close_data = data['Close']
 
-            if data.empty:
-                st.error("❌ Data contains only NaN values.")
-                st.stop()
+if isinstance(close_data, pd.DataFrame):
+    close_data = close_data.iloc[:, 0]
 
-            # -------------------------------
-            # SAFE VALUE EXTRACTION
-            # -------------------------------
-            current_val = float(data['Close'].iloc[-1])
-            prev_val = float(data['Close'].iloc[-2]) if len(data) > 1 else current_val
+close_data = close_data.dropna()
 
-            change = current_val - prev_val
-            percent_change = (change / prev_val) * 100 if prev_val != 0 else 0
+if close_data.empty:
+    st.error("❌ No valid Close data available.")
+    st.stop()
 
-            # -------------------------------
-            # DISPLAY METRICS
-            # -------------------------------
-            st.subheader(f"{selected_index}")
+# -------------------------------
+# CALCULATIONS
+# -------------------------------
+current_val = float(close_data.iloc[-1])
+prev_val = float(close_data.iloc[-2]) if len(close_data) > 1 else current_val
 
-            col1, col2, col3 = st.columns(3)
+change = current_val - prev_val
+percent_change = (change / prev_val) * 100 if prev_val != 0 else 0
 
-            col1.metric("Current Value", f"{current_val:.2f}")
-            col2.metric("Change", f"{change:.2f}")
-            col3.metric("Change %", f"{percent_change:.2f}%")
+# -------------------------------
+# METRICS DISPLAY
+# -------------------------------
+st.subheader(selected_index)
 
-            # -------------------------------
-            # CHART
-            # -------------------------------
-            st.line_chart(data['Close'])
+col1, col2, col3 = st.columns(3)
 
-            # -------------------------------
-            # DEBUG (Optional)
-            # -------------------------------
-            with st.expander("Show Raw Data"):
-                st.write(data.tail())
+col1.metric("Current Value", f"{current_val:.2f}")
+col2.metric("Change", f"{change:.2f}")
+col3.metric("Change %", f"{percent_change:.2f}%")
 
-        except Exception as e:
-            st.error(f"Error occurred: {e}")
-            st.stop()
+# -------------------------------
+# CANDLESTICK CHART
+# -------------------------------
+st.subheader("📊 Candlestick Chart")
+
+fig = go.Figure(data=[go.Candlestick(
+    x=data.index,
+    open=data['Open'],
+    high=data['High'],
+    low=data['Low'],
+    close=data['Close']
+)])
+
+fig.update_layout(
+    xaxis_rangeslider_visible=False,
+    height=500
+)
+
+st.plotly_chart(fig, use_container_width=True)
+
+# -------------------------------
+# LINE CHART (OPTIONAL)
+# -------------------------------
+st.subheader("📈 Close Price Trend")
+st.line_chart(close_data)
+
+# -------------------------------
+# RAW DATA
+# -------------------------------
+with st.expander("🔍 Show Raw Data"):
+    st.write(data.tail())
