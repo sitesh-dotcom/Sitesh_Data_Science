@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Backend Data — Learning Future With Us</title>
+  <link rel="stylesheet" href="css/style.css"/>
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+  <style>
+    .backend-wrap { max-width: 1200px; margin: 0 auto; padding: 1rem 2rem 3rem; }
+    .admin-toolbar {
+      display: flex; gap: 1rem; flex-wrap: wrap;
+      align-items: center; margin-bottom: 1.5rem;
+      background: var(--bg-card); border: 1px solid var(--card-border);
+      border-radius: var(--radius-md); padding: 1rem 1.3rem;
+    }
+    .admin-toolbar input { flex: 1; min-width: 180px; }
+    .admin-toolbar select { width: auto; }
+    .toolbar-btn {
+      padding: 0.55rem 1.2rem; border-radius: 8px; font-size: 0.83rem;
+      font-weight: 600; cursor: pointer; border: none; font-family: var(--font-body);
+      transition: all 0.2s; white-space: nowrap;
+    }
+    .btn-export { background: rgba(0,229,195,0.15); color: var(--accent3); border: 1px solid rgba(0,229,195,0.3); }
+    .btn-export:hover { background: rgba(0,229,195,0.25); }
+    .btn-add { background: var(--accent); color: #1a0533; }
+    .btn-add:hover { box-shadow: 0 4px 14px rgba(247,201,72,0.35); }
+    .summary-cards { display: grid; grid-template-columns: repeat(auto-fit,minmax(150px,1fr)); gap: 1rem; margin-bottom: 1.5rem; }
+    .sum-card { background: var(--bg-card); border: 1px solid var(--card-border); border-radius: var(--radius-md); padding: 1rem; text-align: center; }
+    .sum-val { font-family: var(--font-display); font-size: 1.5rem; font-weight: 800; }
+    .sum-label { font-size: 0.75rem; color: var(--text-muted); margin-top: 3px; }
+    .action-btn {
+      padding: 3px 10px; border-radius: 6px; font-size: 0.7rem;
+      font-weight: 600; cursor: pointer; border: none; font-family: var(--font-body);
+      margin-right: 4px; transition: opacity 0.2s;
+    }
+    .action-btn:hover { opacity: 0.8; }
+    .btn-view   { background: rgba(83,74,183,0.3); color: #a89cff; }
+    .btn-edit   { background: rgba(247,201,72,0.2); color: var(--accent); }
+    .btn-delete { background: rgba(255,111,97,0.2); color: #ff6f61; }
+    .pagination { display: flex; gap: 0.5rem; justify-content: center; margin-top: 1.2rem; }
+    .page-btn {
+      width: 34px; height: 34px; border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      background: var(--bg-card); border: 1px solid var(--card-border);
+      font-size: 0.82rem; font-weight: 600; cursor: pointer; color: var(--text-muted);
+      transition: all 0.2s;
+    }
+    .page-btn.active, .page-btn:hover { background: var(--accent); color: #1a0533; border-color: var(--accent); }
+    .modal-overlay {
+      display: none; position: fixed; inset: 0;
+      background: rgba(0,0,0,0.7); backdrop-filter: blur(6px);
+      z-index: 2000; align-items: center; justify-content: center;
+    }
+    .modal-overlay.open { display: flex; }
+    .modal-box {
+      background: #1a0533; border: 1px solid var(--card-border);
+      border-radius: var(--radius-xl); padding: 2rem;
+      max-width: 480px; width: 90%; max-height: 90vh; overflow-y: auto;
+    }
+    .modal-title { font-family: var(--font-display); font-size: 1.1rem; font-weight: 700; margin-bottom: 1.2rem; }
+    .modal-close { float: right; cursor: pointer; font-size: 1.3rem; color: var(--text-muted); line-height: 1; }
+    .modal-close:hover { color: var(--text); }
+    .chart-bar-wrap { margin-top: 1.5rem; }
+    .chart-bar-wrap h3 { font-family: var(--font-display); font-size: 0.95rem; font-weight: 700; margin-bottom: 1rem; }
+    .bar-item { margin-bottom: 0.8rem; }
+    .bar-label { display: flex; justify-content: space-between; font-size: 0.78rem; margin-bottom: 0.3rem; }
+    .bar-track { height: 8px; background: rgba(255,255,255,0.08); border-radius: 4px; overflow: hidden; }
+    .bar-fill   { height: 100%; border-radius: 4px; background: linear-gradient(90deg,var(--accent),#ff9f43); transition: width 1s ease; }
+  </style>
+</head>
+<body>
+  <nav class="navbar">
+    <div class="logo">Learning<span>Future</span> 🤖</div>
+    <ul class="nav-links">
+      <li><a href="index.html">Home</a></li>
+      <li><a href="courses.html">Courses</a></li>
+      <li><a href="fees.html">Fee Structure</a></li>
+      <li><a href="login.html">Student Login</a></li>
+      <li><a href="backend.html" class="active">Backend</a></li>
+      <li><a href="helpdesk.html">Help Desk</a></li>
+      <li><a href="payment.html">Payment</a></li>
+      <li><a href="login.html" class="btn-nav">Enroll Now</a></li>
+    </ul>
+    <div class="hamburger" onclick="toggleMenu()">☰</div>
+  </nav>
+
+  <div class="page-hero">
+    <span class="pill pill-yellow">🗄️ Admin Panel</span>
+    <h1>Backend Data Sheet</h1>
+    <p>Complete enrolled candidates database — Admin &amp; Instructor View</p>
+  </div>
+
+  <div class="backend-wrap">
+
+    <!-- SUMMARY CARDS -->
+    <div class="summary-cards">
+      <div class="sum-card"><div class="sum-val" style="color:var(--accent)">8</div><div class="sum-label">Total Students</div></div>
+      <div class="sum-card"><div class="sum-val" style="color:#00e5c3">6</div><div class="sum-label">Active</div></div>
+      <div class="sum-card"><div class="sum-val" style="color:#f7c948">2</div><div class="sum-label">Pending</div></div>
+      <div class="sum-card"><div class="sum-val" style="color:#ff6f61">1</div><div class="sum-label">Inactive</div></div>
+      <div class="sum-card"><div class="sum-val" style="color:var(--accent)">₹5.8L</div><div class="sum-label">Total Revenue</div></div>
+      <div class="sum-card"><div class="sum-val" style="color:#00e5c3">59%</div><div class="sum-label">Avg Progress</div></div>
+    </div>
+
+    <!-- TOOLBAR -->
+    <div class="admin-toolbar">
+      <input class="form-input" id="searchInput" placeholder="🔍 Search by name, ID, course..." oninput="filterTable()" style="flex:1;min-width:180px"/>
+      <select class="form-select" id="statusFilter" onchange="filterTable()" style="width:auto">
+        <option value="">All Status</option>
+        <option value="active">Active</option>
+        <option value="pending">Pending</option>
+        <option value="inactive">Inactive</option>
+      </select>
+      <select class="form-select" id="planFilter" onchange="filterTable()" style="width:auto">
+        <option value="">All Plans</option>
+        <option value="Starter">Starter</option>
+        <option value="Professional">Professional</option>
+        <option value="Elite">Elite</option>
+      </select>
+      <button class="toolbar-btn btn-export" onclick="exportCSV()">⬇ Export CSV</button>
+      <button class="toolbar-btn btn-add" onclick="openAddModal()">+ Add Student</button>
+    </div>
+
+    <!-- DATA TABLE -->
+    <div class="data-table-wrap">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Student ID</th>
+            <th>Name</th>
+            <th>Course</th>
+            <th>Plan</th>
+            <th>Fee Paid</th>
+            <th>Enrolled Date</th>
+            <th>Progress</th>
+            <th>Status</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="backendTbody"></tbody>
+      </table>
+    </div>
+
+    <div class="pagination" id="pagination"></div>
+
+    <!-- CHARTS -->
+    <div class="chart-bar-wrap">
+      <h3>📊 Enrollment by Course</h3>
+      <div id="courseChart"></div>
+    </div>
+
+  </div>
+
+  <!-- ADD STUDENT MODAL -->
+  <div class="modal-overlay" id="addModal">
+    <div class="modal-box">
+      <span class="modal-close" onclick="closeModal('addModal')">✕</span>
+      <div class="modal-title">➕ Add New Student</div>
+      <div class="form-group"><label class="form-label">Full Name</label><input class="form-input" id="addName" placeholder="Student Full Name"/></div>
+      <div class="form-group"><label class="form-label">Email</label><input class="form-input" id="addEmail" placeholder="email@example.com" type="email"/></div>
+      <div class="form-group"><label class="form-label">Course</label>
+        <select class="form-select" id="addCourse">
+          <option>AI &amp; ML Fundamentals</option><option>Data Science Essentials</option>
+          <option>Machine Learning Pro</option><option>NLP &amp; Generative AI</option>
+          <option>Computer Vision with AI</option><option>Deep Learning Research</option>
+          <option>AI for Business &amp; Strategy</option>
+        </select>
+      </div>
+      <div class="form-group"><label class="form-label">Plan</label>
+        <select class="form-select" id="addPlan">
+          <option>Starter</option><option>Professional</option><option>Elite</option>
+        </select>
+      </div>
+      <div class="form-group"><label class="form-label">Fee Paid</label><input class="form-input" id="addFee" placeholder="e.g. ₹9,999"/></div>
+      <button class="btn-primary" style="width:100%;margin-top:0.5rem" onclick="addStudent()">Add Student to Database</button>
+      <div id="addAlert" class="alert"></div>
+    </div>
+  </div>
+
+  <!-- VIEW STUDENT MODAL -->
+  <div class="modal-overlay" id="viewModal">
+    <div class="modal-box">
+      <span class="modal-close" onclick="closeModal('viewModal')">✕</span>
+      <div class="modal-title">👤 Student Profile</div>
+      <div id="viewContent"></div>
+    </div>
+  </div>
+
+  <footer class="footer">
+    <div class="container">
+      <div class="footer-bottom">
+        <p>© 2026 Learning Future With Us · Admin Panel</p>
+      </div>
+    </div>
+  </footer>
+
+  <script src="js/main.js"></script>
+  <script>
+    let allStudents = [...BACKEND_DATA];
+    let currentPage = 1;
+    const perPage = 5;
+
+    function renderTable(data) {
+      const tbody = document.getElementById('backendTbody');
+      const start = (currentPage - 1) * perPage;
+      const paged = data.slice(start, start + perPage);
+      tbody.innerHTML = paged.map(r => `
+        <tr>
+          <td>${r.id}</td>
+          <td style="color:var(--text);font-weight:500">${r.name}</td>
+          <td>${r.course}</td>
+          <td>${r.plan}</td>
+          <td style="color:var(--accent3)">${r.fee}</td>
+          <td>${r.date}</td>
+          <td>
+            <div style="display:flex;align-items:center;gap:6px">
+              <div style="flex:1;height:5px;background:rgba(255,255,255,0.1);border-radius:3px;overflow:hidden">
+                <div style="height:100%;width:${r.progress};background:linear-gradient(90deg,var(--accent),#ff9f43);border-radius:3px"></div>
+              </div>
+              <span style="font-size:0.75rem;white-space:nowrap">${r.progress}</span>
+            </div>
+          </td>
+          <td><span class="status-badge sb-${r.status}">${r.status}</span></td>
+          <td>
+            <button class="action-btn btn-view" onclick="viewStudent('${r.id}')">View</button>
+            <button class="action-btn btn-edit" onclick="editStatus('${r.id}')">Edit</button>
+            <button class="action-btn btn-delete" onclick="deleteStudent('${r.id}')">Del</button>
+          </td>
+        </tr>`).join('');
+      renderPagination(data.length);
+      renderChart(data);
+    }
+
+    function renderPagination(total) {
+      const pages = Math.ceil(total / perPage);
+      const pag = document.getElementById('pagination');
+      pag.innerHTML = '';
+      for (let i = 1; i <= pages; i++) {
+        const btn = document.createElement('div');
+        btn.className = 'page-btn' + (i === currentPage ? ' active' : '');
+        btn.textContent = i;
+        btn.onclick = () => { currentPage = i; filterTable(); };
+        pag.appendChild(btn);
+      }
+    }
+
+    function filterTable() {
+      const q      = document.getElementById('searchInput').value.toLowerCase();
+      const status = document.getElementById('statusFilter').value;
+      const plan   = document.getElementById('planFilter').value;
+      const filtered = allStudents.filter(r =>
+        (!q || r.id.toLowerCase().includes(q) || r.name.toLowerCase().includes(q) || r.course.toLowerCase().includes(q)) &&
+        (!status || r.status === status) &&
+        (!plan   || r.plan   === plan)
+      );
+      currentPage = 1;
+      renderTable(filtered);
+    }
+
+    function renderChart(data) {
+      const counts = {};
+      data.forEach(r => { counts[r.course] = (counts[r.course] || 0) + 1; });
+      const max = Math.max(...Object.values(counts));
+      const colors = ['var(--accent)','#ff9f43','#ff6f61','#00e5c3','#534ab7','#e056fd','#00bcd4'];
+      document.getElementById('courseChart').innerHTML = Object.entries(counts).map(([course, count], i) => `
+        <div class="bar-item">
+          <div class="bar-label"><span>${course}</span><span style="color:${colors[i%colors.length]}">${count} student${count>1?'s':''}</span></div>
+          <div class="bar-track"><div class="bar-fill" style="width:${(count/max*100)}%;background:${colors[i%colors.length]}"></div></div>
+        </div>`).join('');
+    }
+
+    function viewStudent(id) {
+      const s = allStudents.find(r => r.id === id);
+      if (!s) return;
+      document.getElementById('viewContent').innerHTML = `
+        <div style="display:flex;gap:1rem;align-items:center;margin-bottom:1.2rem">
+          <div style="width:56px;height:56px;border-radius:50%;background:linear-gradient(135deg,#f7c948,#ff9f43);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:1.3rem;color:#1a0533">${s.name[0]}</div>
+          <div><div style="font-weight:700;font-size:1rem">${s.name}</div><div style="color:var(--accent3);font-size:0.78rem">${s.id}</div></div>
+        </div>
+        ${[['Course',s.course],['Plan',s.plan],['Fee Paid',s.fee],['Enrolled',s.date],['Progress',s.progress],['Status',s.status]].map(([k,v])=>`
+          <div style="display:flex;justify-content:space-between;padding:0.5rem 0;border-bottom:1px solid rgba(255,255,255,0.06);font-size:0.85rem">
+            <span style="color:var(--text-muted)">${k}</span>
+            <span style="font-weight:600">${v}</span>
+          </div>`).join('')}`;
+      openModal('viewModal');
+    }
+
+    function editStatus(id) {
+      const s = allStudents.find(r => r.id === id);
+      if (!s) return;
+      const statuses = ['active','pending','inactive'];
+      const idx = statuses.indexOf(s.status);
+      s.status = statuses[(idx+1) % statuses.length];
+      filterTable();
+    }
+
+    function deleteStudent(id) {
+      if (!confirm('Remove student ' + id + ' from the database?')) return;
+      allStudents = allStudents.filter(r => r.id !== id);
+      filterTable();
+    }
+
+    function addStudent() {
+      const name = document.getElementById('addName').value.trim();
+      const fee  = document.getElementById('addFee').value.trim();
+      if (!name || !fee) { showAlert('addAlert','⚠ Name and Fee are required.','error'); return; }
+      const newStudent = {
+        id: genStudentId(),
+        name,
+        course: document.getElementById('addCourse').value,
+        plan:   document.getElementById('addPlan').value,
+        fee,
+        date: new Date().toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'}),
+        progress: '0%',
+        status: 'pending'
+      };
+      allStudents.unshift(newStudent);
+      filterTable();
+      showAlert('addAlert','✅ Student added successfully! ID: ' + newStudent.id,'success');
+      setTimeout(() => closeModal('addModal'), 2000);
+    }
+
+    function exportCSV() {
+      const headers = ['Student ID','Name','Course','Plan','Fee Paid','Enrolled Date','Progress','Status'];
+      const rows = allStudents.map(r => [r.id,r.name,r.course,r.plan,r.fee,r.date,r.progress,r.status].join(','));
+      const csv = [headers.join(','), ...rows].join('\n');
+      const blob = new Blob([csv], { type: 'text/csv' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'LearningFuture_Students_' + new Date().toISOString().slice(0,10) + '.csv';
+      a.click();
+    }
+
+    function openModal(id)  { document.getElementById(id).classList.add('open'); }
+    function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+    function openAddModal() { openModal('addModal'); }
+
+    // Init
+    renderTable(allStudents);
+  </script>
+</body>
+</html>

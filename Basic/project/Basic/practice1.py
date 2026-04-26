@@ -1,3 +1,34 @@
+import seaborn as sns
+import matplotlib.pyplot as plt
+
+# 1. Load the dataset
+df = sns.load_dataset('titanic')
+# 6. Print the first 5 rows to see the data
+# 7. Calculate and print the survival rate
+survival_count = df['survived'].value_counts()
+survival_rate = df['survived'].mean() * 100
+
+print(f"\n--- Survival Stats ---")
+print(f"Number of survivors: {survival_count[1]}")
+print(f"Number of deaths: {survival_count[0]}")
+print(f"Overall Survival Rate: {survival_rate:.2f}%")
+print("\n--- Titanic Dataset Preview ---")
+print(df.head())
+# 2. Select only the numerical columns (Correlation only works on numbers)
+numerical_df = df.select_dtypes(include=['float64', 'int64'])
+
+# 3. Calculate the correlation matrix
+corr_matrix = numerical_df.corr()
+
+# 4. Create the heatmap
+plt.figure(figsize=(10, 8))
+sns.heatmap(corr_matrix, annot=True, cmap='coolwarm', fmt=".2f")
+
+# 5. Add a title and show it
+plt.title('Correlation Heatmap: Titanic Dataset')
+plt.savefig('my_heatmap.png')
+
+# website coding
 import pandas as pd
 import streamlit as st
 import yfinance as yf
@@ -51,10 +82,27 @@ if st.button("Update Market Data", key="final_update_btn"):
         data['RSI'] = 100 - (100 / (1+rs))
 
         # Prediction Logic
-        data_for_model = data.dropna().copy()
-        pred_val = None
-        current_val = float(data['Close'].iloc[-1].values[0])
+        # --- NEW DATA LOGIC ---
+# Fetch data
+        data = yf.download(ticker, selected_period, interval='5m' if period == '1d' else '1d')
 
+if not data.empty:
+    # Only runs if the market returned actual prices
+    current_val = float(data['Close'].iloc[-1])
+    prev_val = float(data['Close'].iloc[0])
+    
+    # Calculate changes for your metrics
+    change = current_val - prev_val
+    percent_change = (change / prev_val) * 100
+
+    # Display the metric at the top
+    col1.metric(ticker, f"{current_val:,.2f}", f"{percent_change:+.2f}%")
+    
+    # Prediction logic (existing code moves inside this block)
+    data_for_model = data.dropna().copy()
+    # ... rest of your model code ...
+else:
+    st.warning(f"No data available for {ticker} right now. The market might be closed.")
         if len(data_for_model) > 1:
             data_for_model['Seconds'] = np.arange(len(data_for_model))
             X = data_for_model[['Seconds']]
@@ -99,3 +147,9 @@ if st.button("Update Market Data", key="final_update_btn"):
         st.error("No data found. Check your selection.")
         # This moves the file "up" one level to the main project folder
         
+
+
+
+
+
+

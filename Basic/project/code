@@ -1,0 +1,10 @@
+git
+vscode
+github
+git add .
+git commit -m "dquote>code added"
+git remote add origin https://github.com/sitesh-dotcom/Sitesh_Data_Science.git
+git branch -M main
+git push -u origin main
+Next
+

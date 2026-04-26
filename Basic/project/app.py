@@ -53,7 +53,7 @@ if st.button("Update Market Data", key="final_update_btn"):
         # Prediction Logic
         data_for_model = data.dropna().copy()
         pred_val = None
-        current_val = float(data['Close'].iloc[-1].values[0])
+        current_val = float(data['Close'].iloc[-1])
 
         if len(data_for_model) > 1:
             data_for_model['Seconds'] = np.arange(len(data_for_model))
