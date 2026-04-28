@@ -9,21 +9,40 @@
   <style>
     .backend-wrap { max-width: 1200px; margin: 0 auto; padding: 1rem 2rem 3rem; }
 
-    /* ---- STORAGE INDICATOR ---- */
-    .storage-info {
+    /* ---- GOOGLE SHEET INDICATOR ---- */
+    .sheet-info {
       display: flex; align-items: center; gap: 0.7rem;
       font-size: 0.78rem; color: var(--text-muted);
       background: rgba(0,229,195,0.07);
       border: 1px solid rgba(0,229,195,0.22);
-      border-radius: 10px; padding: 0.55rem 1rem;
+      border-radius: 10px; padding: 0.6rem 1rem;
       margin-bottom: 1.2rem; flex-wrap: wrap;
     }
-    .storage-dot {
+    .sheet-dot {
       width: 9px; height: 9px; border-radius: 50%;
       background: var(--accent3); flex-shrink: 0;
       animation: blink 2s infinite;
     }
+    .sheet-dot.red   { background: #ff6f61; animation: none; }
+    .sheet-dot.yellow{ background: #f7c948; }
     @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+    /* ---- LOADING OVERLAY ---- */
+    .loading-overlay {
+      display: none; position: fixed; inset: 0;
+      background: rgba(0,0,0,0.6); backdrop-filter: blur(4px);
+      z-index: 5000; align-items: center; justify-content: center;
+      flex-direction: column; gap: 1rem;
+    }
+    .loading-overlay.show { display: flex; }
+    .spinner {
+      width: 44px; height: 44px; border-radius: 50%;
+      border: 4px solid rgba(247,201,72,0.2);
+      border-top-color: var(--accent);
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .loading-text { color: var(--text); font-size: 0.88rem; font-weight: 600; }
 
     /* ---- SUMMARY CARDS ---- */
     .summary-cards {
@@ -56,12 +75,12 @@
       border: none; font-family: var(--font-body);
       transition: all 0.2s; white-space: nowrap;
     }
+    .btn-refresh{ background: rgba(83,74,183,0.2);  color: #a89cff; border: 1px solid rgba(83,74,183,0.3); }
+    .btn-refresh:hover { background: rgba(83,74,183,0.35); }
     .btn-export { background: rgba(0,229,195,0.13); color: var(--accent3); border: 1px solid rgba(0,229,195,0.28); }
     .btn-export:hover { background: rgba(0,229,195,0.24); }
-    .btn-reset  { background: rgba(255,111,97,0.13); color: #ff6f61; border: 1px solid rgba(255,111,97,0.28); }
-    .btn-reset:hover  { background: rgba(255,111,97,0.24); }
     .btn-add    { background: var(--accent); color: #1a0533; }
-    .btn-add:hover    { box-shadow: 0 4px 14px rgba(247,201,72,0.38); transform: translateY(-1px); }
+    .btn-add:hover { box-shadow: 0 4px 14px rgba(247,201,72,0.38); transform: translateY(-1px); }
 
     /* ---- ACTION BUTTONS ---- */
     .action-btn {
@@ -179,14 +198,23 @@
       font-size: 0.83rem; font-weight: 600; z-index: 9999;
       transform: translateY(80px); opacity: 0; pointer-events: none;
       transition: transform 0.3s ease, opacity 0.3s ease;
-      max-width: 320px; box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+      max-width: 340px; box-shadow: 0 8px 24px rgba(0,0,0,0.4);
     }
-    .toast.show             { transform: translateY(0); opacity: 1; }
-    .toast.toast-success    { border-left: 4px solid #00e5c3; color: #00e5c3; }
-    .toast.toast-error      { border-left: 4px solid #ff6f61; color: #ff6f61; }
-    .toast.toast-info       { border-left: 4px solid var(--accent); color: var(--accent); }
+    .toast.show          { transform: translateY(0); opacity: 1; }
+    .toast.toast-success { border-left: 4px solid #00e5c3; color: #00e5c3; }
+    .toast.toast-error   { border-left: 4px solid #ff6f61; color: #ff6f61; }
+    .toast.toast-info    { border-left: 4px solid var(--accent); color: var(--accent); }
 
-    /* ---- MISC ---- */
+    /* ---- OPEN SHEET BUTTON ---- */
+    .open-sheet-btn {
+      display: inline-flex; align-items: center; gap: 0.4rem;
+      background: rgba(66,133,244,0.15); border: 1px solid rgba(66,133,244,0.3);
+      color: #6ea8fe; padding: 0.45rem 1rem; border-radius: 8px;
+      font-size: 0.78rem; font-weight: 600; cursor: pointer;
+      text-decoration: none; transition: all 0.2s;
+    }
+    .open-sheet-btn:hover { background: rgba(66,133,244,0.28); }
+
     th[onclick] { cursor: pointer; user-select: none; }
     th[onclick]:hover { color: var(--accent); }
 
@@ -199,6 +227,12 @@
   </style>
 </head>
 <body>
+
+<!-- ==================== LOADING OVERLAY ==================== -->
+<div class="loading-overlay" id="loadingOverlay">
+  <div class="spinner"></div>
+  <div class="loading-text" id="loadingText">Connecting to Google Sheet...</div>
+</div>
 
 <!-- ==================== NAVBAR ==================== -->
 <nav class="navbar">
@@ -220,27 +254,31 @@
 <div class="page-hero">
   <span class="pill pill-yellow">🗄️ Admin Panel</span>
   <h1>Backend Data Sheet</h1>
-  <p>Complete enrolled candidates database — Admin &amp; Instructor View</p>
+  <p>Live database powered by Google Sheets — visible on every device</p>
 </div>
 
 <!-- ==================== MAIN CONTENT ==================== -->
 <div class="backend-wrap">
 
-  <!-- STORAGE INDICATOR -->
-  <div class="storage-info">
-    <div class="storage-dot"></div>
-    <span id="storageStatus">Data saved to localStorage — persists after browser refresh ✓</span>
-    <span style="margin-left:auto;color:var(--accent3);font-weight:700" id="recordCount"></span>
+  <!-- GOOGLE SHEET INDICATOR -->
+  <div class="sheet-info">
+    <div class="sheet-dot" id="connDot"></div>
+    <span id="connStatus">Connecting to Google Sheet...</span>
+    <a class="open-sheet-btn" style="margin-left:auto"
+       href="https://docs.google.com/spreadsheets/d/13IV8MHJokOIBKwmpmIAMcx6ECPgPCfSsuJxpq3WR08E/edit"
+       target="_blank">
+      📊 Open Google Sheet
+    </a>
   </div>
 
   <!-- SUMMARY CARDS -->
   <div class="summary-cards">
-    <div class="sum-card"><div class="sum-val" style="color:var(--accent)"  id="sumTotal">0</div><div class="sum-label">Total Students</div></div>
-    <div class="sum-card"><div class="sum-val" style="color:#00e5c3"         id="sumActive">0</div><div class="sum-label">Active</div></div>
-    <div class="sum-card"><div class="sum-val" style="color:#f7c948"         id="sumPending">0</div><div class="sum-label">Pending</div></div>
-    <div class="sum-card"><div class="sum-val" style="color:#ff6f61"         id="sumInactive">0</div><div class="sum-label">Inactive</div></div>
-    <div class="sum-card"><div class="sum-val" style="color:var(--accent)"  id="sumRevenue">₹0</div><div class="sum-label">Total Revenue</div></div>
-    <div class="sum-card"><div class="sum-val" style="color:#00e5c3"         id="sumProgress">0%</div><div class="sum-label">Avg Progress</div></div>
+    <div class="sum-card"><div class="sum-val" style="color:var(--accent)"  id="sumTotal">—</div><div class="sum-label">Total Students</div></div>
+    <div class="sum-card"><div class="sum-val" style="color:#00e5c3"         id="sumActive">—</div><div class="sum-label">Active</div></div>
+    <div class="sum-card"><div class="sum-val" style="color:#f7c948"         id="sumPending">—</div><div class="sum-label">Pending</div></div>
+    <div class="sum-card"><div class="sum-val" style="color:#ff6f61"         id="sumInactive">—</div><div class="sum-label">Inactive</div></div>
+    <div class="sum-card"><div class="sum-val" style="color:var(--accent)"  id="sumRevenue">—</div><div class="sum-label">Total Revenue</div></div>
+    <div class="sum-card"><div class="sum-val" style="color:#00e5c3"         id="sumProgress">—</div><div class="sum-label">Avg Progress</div></div>
   </div>
 
   <!-- TOOLBAR -->
@@ -258,9 +296,9 @@
       <option value="Professional">Professional</option>
       <option value="Elite">Elite</option>
     </select>
-    <button class="toolbar-btn btn-export" onclick="exportCSV()">⬇ Export CSV</button>
-    <button class="toolbar-btn btn-reset"  onclick="confirmReset()">↺ Reset Data</button>
-    <button class="toolbar-btn btn-add"    onclick="openAddModal()">＋ Add Student</button>
+    <button class="toolbar-btn btn-refresh" onclick="loadFromSheet()">🔄 Refresh</button>
+    <button class="toolbar-btn btn-export"  onclick="exportCSV()">⬇ Export CSV</button>
+    <button class="toolbar-btn btn-add"     onclick="openAddModal()">＋ Add Student</button>
   </div>
 
   <!-- DATA TABLE -->
@@ -268,14 +306,14 @@
     <table class="data-table">
       <thead>
         <tr>
-          <th onclick="sortBy('id')">Student ID ↕</th>
-          <th onclick="sortBy('name')">Name ↕</th>
-          <th onclick="sortBy('course')">Course ↕</th>
+          <th onclick="sortBy('ID')">Student ID ↕</th>
+          <th onclick="sortBy('Name')">Name ↕</th>
+          <th onclick="sortBy('Course')">Course ↕</th>
           <th>Plan</th>
           <th>Fee Paid</th>
-          <th onclick="sortBy('date')">Enrolled ↕</th>
-          <th onclick="sortBy('progress')">Progress ↕</th>
-          <th onclick="sortBy('status')">Status ↕</th>
+          <th onclick="sortBy('Date')">Enrolled ↕</th>
+          <th onclick="sortBy('Progress')">Progress ↕</th>
+          <th onclick="sortBy('Status')">Status ↕</th>
           <th>Actions</th>
         </tr>
       </thead>
@@ -319,7 +357,6 @@
       <div class="modal-title">➕ Add New Student</div>
       <button class="modal-close" onclick="closeModal('addModal')">✕</button>
     </div>
-
     <div class="form-group">
       <label class="form-label">Full Name <span style="color:#ff6f61">*</span></label>
       <input class="form-input" id="addName" placeholder="e.g. Sitesh Kumar"/>
@@ -377,9 +414,8 @@
         <option value="inactive">Inactive</option>
       </select>
     </div>
-
     <button class="btn-primary" style="width:100%;margin-top:0.6rem;padding:0.75rem" onclick="addStudent()">
-      💾 Save Student to Database
+      💾 Save to Google Sheet
     </button>
     <div id="addAlert" class="alert" style="margin-top:0.8rem"></div>
   </div>
@@ -417,12 +453,11 @@
 <!-- TOAST -->
 <div class="toast" id="toast"></div>
 
-
 <!-- ==================== FOOTER ==================== -->
 <footer class="footer">
   <div class="container">
     <div class="footer-bottom">
-      <p>© 2026 Learning Future With Us · Admin Panel · Data persisted via localStorage</p>
+      <p>© 2026 Learning Future With Us · Powered by Google Sheets Database · Visible on all devices</p>
     </div>
   </div>
 </footer>
@@ -433,27 +468,19 @@
 <script>
 
 /* ============================================================
-   CONSTANTS & DEFAULT DATA
+   GOOGLE APPS SCRIPT WEB APP URL
 ============================================================ */
-const LS_KEY = 'lf_students_v1';
+const SHEET_URL = 'https://script.google.com/macros/s/AKfycbzRcpco9gM4WvjQGHl6mJ5ntBQyN0LlAQZpFCjkClYEBAlLsXX_fF7sTjW9hh2MM9s/exec';
 
-const DEFAULT_STUDENTS = [
-  { id:'LF-2024-0001', name:'Rahul Sharma',   email:'rahul@email.com',   mobile:'+91 98100 11111', city:'Delhi',      course:'Machine Learning Pro',        plan:'Professional', duration:'6',  fee:'₹59,994',    date:'Jan 12, 2024', progress:'92', status:'active'   },
-  { id:'LF-2024-0042', name:'Priya Singh',     email:'priya@email.com',   mobile:'+91 98200 22222', city:'Mumbai',     course:'AI & ML Fundamentals',        plan:'Starter',      duration:'3',  fee:'₹14,997',    date:'Feb 3, 2024',  progress:'78', status:'active'   },
-  { id:'LF-2024-0089', name:'Amit Kumar',      email:'amit@email.com',    mobile:'+91 98300 33333', city:'Bangalore',  course:'Deep Learning Research',      plan:'Elite',        duration:'12', fee:'₹2,39,988',  date:'Mar 15, 2024', progress:'45', status:'active'   },
-  { id:'LF-2024-0103', name:'Sneha Patel',     email:'sneha@email.com',   mobile:'+91 98400 44444', city:'Ahmedabad',  course:'NLP & Generative AI',         plan:'Professional', duration:'3',  fee:'₹29,997',    date:'Mar 28, 2024', progress:'61', status:'pending'  },
-  { id:'LF-2024-0156', name:'Rajesh Verma',    email:'rajesh@email.com',  mobile:'+91 98500 55555', city:'Patna',      course:'Computer Vision with AI',     plan:'Professional', duration:'1',  fee:'₹9,999',     date:'Apr 1, 2024',  progress:'20', status:'active'   },
-  { id:'LF-2024-0201', name:'Meera Joshi',     email:'meera@email.com',   mobile:'+91 98600 66666', city:'Pune',       course:'AI for Business & Strategy',  plan:'Elite',        duration:'6',  fee:'₹1,19,994',  date:'Apr 10, 2024', progress:'88', status:'inactive' },
-  { id:'LF-2024-0237', name:'Vikram Rao',      email:'vikram@email.com',  mobile:'+91 98700 77777', city:'Hyderabad',  course:'Data Science Essentials',     plan:'Starter',      duration:'1',  fee:'₹4,999',     date:'Apr 18, 2024', progress:'10', status:'pending'  },
-  { id:'LF-2024-0289', name:'Anjali Mishra',   email:'anjali@email.com',  mobile:'+91 98800 88888', city:'Patna',      course:'Machine Learning Pro',        plan:'Professional', duration:'12', fee:'₹1,19,988',  date:'May 2, 2024',  progress:'55', status:'active'   },
-];
-
+/* ============================================================
+   CONSTANTS
+============================================================ */
 const PLAN_FEES    = { Starter: 4999, Professional: 9999, Elite: 19999 };
 const CHART_COLORS = ['#f7c948','#ff6f61','#00e5c3','#534ab7','#ff9f43','#e056fd','#00bcd4'];
 const COURSES_LIST = [
   'AI & ML Fundamentals','Data Science Essentials','Machine Learning Pro',
-  'NLP & Generative AI','Computer Vision with AI','Deep Learning Research',
-  'AI for Business & Strategy'
+  'NLP & Generative AI','Computer Vision with AI',
+  'Deep Learning Research','AI for Business & Strategy'
 ];
 
 /* ============================================================
@@ -461,73 +488,92 @@ const COURSES_LIST = [
 ============================================================ */
 let allStudents = [];
 let currentPage = 1;
-let sortField   = 'id';
+let sortField   = 'ID';
 let sortAsc     = true;
 let editingId   = null;
 let toastTimer  = null;
 const PER_PAGE  = 6;
 
 /* ============================================================
-   LOCALSTORAGE — LOAD / SAVE
+   CONNECTION STATUS UI
 ============================================================ */
-function loadStudents() {
+function setStatus(type, msg) {
+  const dot = document.getElementById('connDot');
+  const txt = document.getElementById('connStatus');
+  if (!dot || !txt) return;
+  dot.className = 'sheet-dot' + (type === 'error' ? ' red' : type === 'loading' ? ' yellow' : '');
+  txt.textContent = msg;
+}
+
+/* ============================================================
+   LOADING OVERLAY
+============================================================ */
+function showLoading(msg) {
+  const ol = document.getElementById('loadingOverlay');
+  const lt = document.getElementById('loadingText');
+  if (ol) ol.classList.add('show');
+  if (lt) lt.textContent = msg || 'Please wait...';
+}
+function hideLoading() {
+  const ol = document.getElementById('loadingOverlay');
+  if (ol) ol.classList.remove('show');
+}
+
+/* ============================================================
+   LOAD DATA FROM GOOGLE SHEET
+============================================================ */
+async function loadFromSheet() {
+  showLoading('Loading students from Google Sheet...');
+  setStatus('loading', '🔄 Fetching data from Google Sheet...');
   try {
-    const raw = localStorage.getItem(LS_KEY);
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+    const res  = await fetch(SHEET_URL, { method: 'GET' });
+    const data = await res.json();
+    if (Array.isArray(data)) {
+      allStudents = data;
+      setStatus('ok', `✅ Google Sheet connected — ${allStudents.length} student(s) loaded — visible on ALL devices`);
+      showToast('✅ Data loaded from Google Sheet!', 'success');
+    } else {
+      throw new Error(data.error || 'Unexpected response');
     }
-  } catch (e) {
-    console.warn('localStorage read error:', e);
+  } catch (err) {
+    setStatus('error', '❌ Could not connect to Google Sheet. Check your internet connection.');
+    showToast('❌ Failed to load data: ' + err.message, 'error');
+    allStudents = [];
   }
-  // First visit — seed defaults
-  const defaults = JSON.parse(JSON.stringify(DEFAULT_STUDENTS));
-  persistStudents(defaults);
-  return defaults;
-}
-
-function persistStudents(data) {
-  try {
-    localStorage.setItem(LS_KEY, JSON.stringify(data));
-  } catch (e) {
-    showToast('⚠ Storage full! Could not save data.', 'error');
-  }
-}
-
-function saveAndRefresh() {
-  persistStudents(allStudents);
-  updateStorageStatus();
+  hideLoading();
+  currentPage = 1;
   filterTable();
+  updateSummary();
 }
 
-function updateStorageStatus() {
-  try {
-    const raw  = localStorage.getItem(LS_KEY) || '';
-    const kb   = (raw.length * 2 / 1024).toFixed(1);
-    const el   = document.getElementById('storageStatus');
-    const cnt  = document.getElementById('recordCount');
-    if (el)  el.textContent  = `✓ localStorage active — ${kb} KB used — data survives refresh`;
-    if (cnt) cnt.textContent = allStudents.length + ' student' + (allStudents.length !== 1 ? 's' : '');
-  } catch (e) {}
+/* ============================================================
+   SEND DATA TO GOOGLE SHEET
+============================================================ */
+async function sheetPost(payload) {
+  const res  = await fetch(SHEET_URL, {
+    method:  'POST',
+    body:    JSON.stringify(payload),
+  });
+  return await res.json();
 }
 
 /* ============================================================
    SUMMARY CARDS
 ============================================================ */
 function updateSummary() {
-  const active   = allStudents.filter(r => r.status === 'active').length;
-  const pending  = allStudents.filter(r => r.status === 'pending').length;
-  const inactive = allStudents.filter(r => r.status === 'inactive').length;
+  const active   = allStudents.filter(r => (r.Status||'').toLowerCase() === 'active').length;
+  const pending  = allStudents.filter(r => (r.Status||'').toLowerCase() === 'pending').length;
+  const inactive = allStudents.filter(r => (r.Status||'').toLowerCase() === 'inactive').length;
 
   let revenue = 0;
   allStudents.forEach(r => {
-    const n = parseInt((r.fee || '0').replace(/[^\d]/g, ''));
+    const n = parseInt((r.Fee || r['Fee Paid'] || '0').replace(/[^\d]/g, ''));
     if (!isNaN(n)) revenue += n;
   });
 
-  const progVals = allStudents.map(r => parseInt(r.progress) || 0);
+  const progVals = allStudents.map(r => parseInt(r.Progress) || 0);
   const avgProg  = progVals.length
-    ? Math.round(progVals.reduce((a, b) => a + b, 0) / progVals.length)
+    ? Math.round(progVals.reduce((a,b)=>a+b,0) / progVals.length)
     : 0;
 
   setText('sumTotal',    allStudents.length);
@@ -556,7 +602,7 @@ function applySort(data) {
   return [...data].sort((a, b) => {
     let va = a[sortField] || '';
     let vb = b[sortField] || '';
-    if (sortField === 'progress') { va = parseInt(va) || 0; vb = parseInt(vb) || 0; }
+    if (sortField === 'Progress') { va = parseInt(va)||0; vb = parseInt(vb)||0; }
     if (va < vb) return sortAsc ? -1 :  1;
     if (va > vb) return sortAsc ?  1 : -1;
     return 0;
@@ -567,23 +613,21 @@ function applySort(data) {
    FILTER + RENDER
 ============================================================ */
 function filterTable() {
-  const q      = (document.getElementById('searchInput')  || {}).value?.toLowerCase().trim() || '';
-  const status = (document.getElementById('statusFilter') || {}).value || '';
-  const plan   = (document.getElementById('planFilter')   || {}).value || '';
+  const q      = (document.getElementById('searchInput')  ||{}).value?.toLowerCase().trim() || '';
+  const status = (document.getElementById('statusFilter') ||{}).value || '';
+  const plan   = (document.getElementById('planFilter')   ||{}).value || '';
 
   let filtered = allStudents.filter(r =>
-    (!q || r.id.toLowerCase().includes(q)        ||
-           r.name.toLowerCase().includes(q)      ||
-           r.course.toLowerCase().includes(q)    ||
-           (r.email  || '').toLowerCase().includes(q) ||
-           (r.city   || '').toLowerCase().includes(q)) &&
-    (!status || r.status === status) &&
-    (!plan   || r.plan   === plan)
+    (!q      || (r.ID     ||'').toLowerCase().includes(q) ||
+                (r.Name   ||'').toLowerCase().includes(q) ||
+                (r.Course ||'').toLowerCase().includes(q) ||
+                (r.Email  ||'').toLowerCase().includes(q) ||
+                (r.City   ||'').toLowerCase().includes(q)) &&
+    (!status || (r.Status ||'').toLowerCase() === status) &&
+    (!plan   || (r.Plan   ||'') === plan)
   );
-
   filtered = applySort(filtered);
   renderTable(filtered);
-  updateSummary();
 }
 
 function clearFilters() {
@@ -599,9 +643,8 @@ function clearFilters() {
    RENDER TABLE
 ============================================================ */
 function renderTable(data) {
-  const tbody  = document.getElementById('backendTbody');
-  const noRes  = document.getElementById('noResults');
-
+  const tbody = document.getElementById('backendTbody');
+  const noRes = document.getElementById('noResults');
   if (!tbody) return;
 
   if (data.length === 0) {
@@ -617,27 +660,27 @@ function renderTable(data) {
   const paged = data.slice(start, start + PER_PAGE);
 
   tbody.innerHTML = paged.map(r => {
-    const prog  = parseInt(r.progress) || 0;
+    const prog   = parseInt(r.Progress) || 0;
     const pColor = prog >= 75 ? '#00e5c3' : prog >= 40 ? '#f7c948' : '#ff6f61';
-    const planColor = r.plan === 'Elite'
-      ? '#ff6f61' : r.plan === 'Professional'
-      ? '#f7c948' : '#00e5c3';
-    const planBg = r.plan === 'Elite'
-      ? 'rgba(255,111,97,0.14)' : r.plan === 'Professional'
-      ? 'rgba(247,201,72,0.14)' : 'rgba(0,229,195,0.14)';
+    const plan   = r.Plan || '';
+    const planColor = plan === 'Elite' ? '#ff6f61' : plan === 'Professional' ? '#f7c948' : '#00e5c3';
+    const planBg    = plan === 'Elite' ? 'rgba(255,111,97,0.14)' : plan === 'Professional' ? 'rgba(247,201,72,0.14)' : 'rgba(0,229,195,0.14)';
+    const status    = (r.Status || 'pending').toLowerCase();
+    const fee       = r.Fee || r['Fee Paid'] || '—';
+    const date      = r.Date || r['Enrolled Date'] || '—';
+    const id        = r.ID || '';
+
     return `
       <tr>
-        <td style="color:var(--accent);font-weight:600;font-size:0.78rem">${r.id}</td>
-        <td style="color:var(--text);font-weight:500">${r.name}</td>
-        <td style="font-size:0.79rem">${r.course}</td>
+        <td style="color:var(--accent);font-weight:600;font-size:0.78rem">${id}</td>
+        <td style="color:var(--text);font-weight:500">${r.Name || ''}</td>
+        <td style="font-size:0.79rem">${r.Course || ''}</td>
         <td>
           <span style="font-size:0.71rem;font-weight:700;padding:3px 8px;border-radius:8px;
-                       background:${planBg};color:${planColor}">
-            ${r.plan}
-          </span>
+                       background:${planBg};color:${planColor}">${plan}</span>
         </td>
-        <td style="color:var(--accent3);font-size:0.81rem">${r.fee}</td>
-        <td style="font-size:0.77rem;color:var(--text-muted)">${r.date}</td>
+        <td style="color:var(--accent3);font-size:0.81rem">${fee}</td>
+        <td style="font-size:0.77rem;color:var(--text-muted)">${date}</td>
         <td style="min-width:110px">
           <div style="display:flex;align-items:center;gap:6px">
             <div style="flex:1;height:5px;background:rgba(255,255,255,0.1);border-radius:3px;overflow:hidden">
@@ -646,36 +689,34 @@ function renderTable(data) {
             <span style="font-size:0.74rem;color:${pColor};white-space:nowrap">${prog}%</span>
           </div>
         </td>
-        <td><span class="status-badge sb-${r.status}">${r.status}</span></td>
+        <td><span class="status-badge sb-${status}">${status}</span></td>
         <td style="white-space:nowrap">
-          <button class="action-btn btn-view"   onclick="viewStudent('${r.id}')">View</button>
-          <button class="action-btn btn-edit"   onclick="editStudent('${r.id}')">Edit</button>
-          <button class="action-btn btn-delete" onclick="deleteStudent('${r.id}')">Del</button>
+          <button class="action-btn btn-view"   onclick="viewStudent('${id}')">View</button>
+          <button class="action-btn btn-edit"   onclick="editStudent('${id}')">Edit</button>
+          <button class="action-btn btn-delete" onclick="deleteStudent('${id}')">Del</button>
         </td>
       </tr>`;
   }).join('');
 
-  renderPagination(data.length, data);
+  renderPagination(data.length);
   renderCharts(allStudents);
-  updateStorageStatus();
 }
 
 /* ============================================================
    PAGINATION
 ============================================================ */
-function renderPagination(total, data) {
+function renderPagination(total) {
   const pages = Math.ceil(total / PER_PAGE);
   const pag   = document.getElementById('pagination');
   if (!pag) return;
   if (pages <= 1) { pag.innerHTML = ''; return; }
-
   let html = '';
   if (currentPage > 1)
-    html += `<div class="page-btn" onclick="goPageNum(${currentPage - 1})">‹</div>`;
+    html += `<div class="page-btn" onclick="goPageNum(${currentPage-1})">‹</div>`;
   for (let i = 1; i <= pages; i++)
-    html += `<div class="page-btn${i === currentPage ? ' active' : ''}" onclick="goPageNum(${i})">${i}</div>`;
+    html += `<div class="page-btn${i===currentPage?' active':''}" onclick="goPageNum(${i})">${i}</div>`;
   if (currentPage < pages)
-    html += `<div class="page-btn" onclick="goPageNum(${currentPage + 1})">›</div>`;
+    html += `<div class="page-btn" onclick="goPageNum(${currentPage+1})">›</div>`;
   pag.innerHTML = html;
 }
 
@@ -685,74 +726,69 @@ function goPageNum(n) { currentPage = n; filterTable(); }
    CHARTS
 ============================================================ */
 function renderCharts(data) {
-  renderBarChart('courseChart', countBy(data, 'course'));
-  renderBarChart('planChart',   countBy(data, 'plan'));
+  renderBarChart('courseChart', countBy(data, 'Course'));
+  renderBarChart('planChart',   countBy(data, 'Plan'));
 }
 
 function countBy(data, field) {
   const c = {};
-  data.forEach(r => { const k = r[field] || 'Unknown'; c[k] = (c[k] || 0) + 1; });
+  data.forEach(r => { const k = r[field]||'Unknown'; c[k]=(c[k]||0)+1; });
   return c;
 }
 
 function renderBarChart(containerId, counts) {
   const el = document.getElementById(containerId);
   if (!el) return;
-  const entries = Object.entries(counts).sort((a, b) => b[1] - a[1]);
-  const max     = entries.length ? Math.max(...entries.map(e => e[1])) : 1;
+  const entries = Object.entries(counts).sort((a,b)=>b[1]-a[1]);
+  const max     = entries.length ? Math.max(...entries.map(e=>e[1])) : 1;
   el.innerHTML  = entries.length === 0
     ? '<div style="color:var(--text-muted);font-size:0.82rem;text-align:center;padding:1rem">No data yet</div>'
-    : entries.map(([label, count], i) => `
+    : entries.map(([label,count],i) => `
         <div class="bar-item">
           <div class="bar-label">
             <span style="max-width:65%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${label}</span>
-            <span style="color:${CHART_COLORS[i % CHART_COLORS.length]};font-weight:700">${count}</span>
+            <span style="color:${CHART_COLORS[i%CHART_COLORS.length]};font-weight:700">${count}</span>
           </div>
           <div class="bar-track">
-            <div class="bar-fill"
-                 style="width:${Math.round(count / max * 100)}%;
-                        background:${CHART_COLORS[i % CHART_COLORS.length]}">
-            </div>
+            <div class="bar-fill" style="width:${Math.round(count/max*100)}%;background:${CHART_COLORS[i%CHART_COLORS.length]}"></div>
           </div>
         </div>`).join('');
 }
 
 /* ============================================================
-   VIEW STUDENT MODAL
+   VIEW STUDENT
 ============================================================ */
 function viewStudent(id) {
-  const s = allStudents.find(r => r.id === id);
+  const s = allStudents.find(r => r.ID === id);
   if (!s) return;
-  const prog = parseInt(s.progress) || 0;
+  const prog = parseInt(s.Progress) || 0;
   const rows = [
-    ['Student ID',    s.id],
-    ['Email',         s.email   || '—'],
-    ['Mobile',        s.mobile  || '—'],
-    ['City',          s.city    || '—'],
-    ['Course',        s.course],
-    ['Plan',          s.plan],
-    ['Duration',      (s.duration || '—') + ' Month(s)'],
-    ['Fee Paid',      s.fee],
-    ['Enrolled Date', s.date],
+    ['Email',         s.Email    || '—'],
+    ['Mobile',        s.Mobile   || '—'],
+    ['City',          s.City     || '—'],
+    ['Course',        s.Course   || '—'],
+    ['Plan',          s.Plan     || '—'],
+    ['Duration',      (s.Duration||'—') + ' Month(s)'],
+    ['Fee Paid',      s.Fee || s['Fee Paid'] || '—'],
+    ['Enrolled Date', s.Date || s['Enrolled Date'] || '—'],
     ['Progress',      prog + '%'],
-    ['Status',        s.status],
+    ['Status',        s.Status   || '—'],
   ];
-
   document.getElementById('viewContent').innerHTML = `
     <div style="display:flex;gap:1rem;align-items:center;margin-bottom:1.4rem">
       <div style="width:58px;height:58px;border-radius:50%;flex-shrink:0;
                   background:linear-gradient(135deg,#f7c948,#ff9f43);
                   display:flex;align-items:center;justify-content:center;
                   font-weight:800;font-size:1.3rem;color:#1a0533">
-        ${(s.name || '?')[0].toUpperCase()}
+        ${(s.Name||'?')[0].toUpperCase()}
       </div>
       <div>
-        <div style="font-weight:700;font-size:1.05rem">${s.name}</div>
-        <div style="color:var(--accent3);font-size:0.78rem;margin-top:2px">${s.id}</div>
-        <span class="status-badge sb-${s.status}" style="display:inline-block;margin-top:5px">${s.status}</span>
+        <div style="font-weight:700;font-size:1.05rem">${s.Name}</div>
+        <div style="color:var(--accent3);font-size:0.78rem;margin-top:2px">${s.ID}</div>
+        <span class="status-badge sb-${(s.Status||'pending').toLowerCase()}"
+              style="display:inline-block;margin-top:5px">${s.Status||'—'}</span>
       </div>
     </div>
-
     <div style="margin-bottom:1.1rem">
       <div style="font-size:0.73rem;color:var(--text-muted);text-transform:uppercase;
                   letter-spacing:0.4px;margin-bottom:0.35rem">Course Progress</div>
@@ -764,335 +800,257 @@ function viewStudent(id) {
         <span style="font-weight:700;color:var(--accent)">${prog}%</span>
       </div>
     </div>
-
-    ${rows.map(([k, v]) => `
+    ${rows.map(([k,v]) => `
       <div class="profile-field">
         <span class="profile-field-label">${k}</span>
         <span class="profile-field-val">${v}</span>
       </div>`).join('')}
-
     <div style="display:flex;gap:0.7rem;margin-top:1.3rem">
       <button class="btn-primary" style="flex:1"
-              onclick="closeModal('viewModal');editStudent('${s.id}')">✏️ Edit</button>
-      <button class="btn-outline"  style="flex:1"
-              onclick="closeModal('viewModal')">Close</button>
+              onclick="closeModal('viewModal');editStudent('${s.ID}')">✏️ Edit</button>
+      <button class="btn-outline" style="flex:1" onclick="closeModal('viewModal')">Close</button>
     </div>`;
-
   openModal('viewModal');
 }
 
 /* ============================================================
-   EDIT STUDENT MODAL
+   EDIT STUDENT
 ============================================================ */
 function editStudent(id) {
-  const s = allStudents.find(r => r.id === id);
+  const s = allStudents.find(r => r.ID === id);
   if (!s) return;
   editingId = id;
-
-  const courseOptions = COURSES_LIST
-    .map(c => `<option${c === s.course ? ' selected' : ''}>${c}</option>`).join('');
-  const planOptions = ['Starter','Professional','Elite']
-    .map(p => `<option${p === s.plan ? ' selected' : ''}>${p}</option>`).join('');
+  const courseOpts = COURSES_LIST.map(c => `<option${c===s.Course?' selected':''}>${c}</option>`).join('');
+  const planOpts   = ['Starter','Professional','Elite'].map(p=>`<option${p===s.Plan?' selected':''}>${p}</option>`).join('');
+  const status     = (s.Status||'pending').toLowerCase();
 
   document.getElementById('editContent').innerHTML = `
-    <div class="form-group">
-      <label class="form-label">Full Name</label>
-      <input class="form-input" id="editName"     value="${s.name   || ''}"/>
-    </div>
-    <div class="form-group">
-      <label class="form-label">Email</label>
-      <input class="form-input" id="editEmail"    value="${s.email  || ''}" type="email"/>
-    </div>
-    <div class="form-group">
-      <label class="form-label">Mobile</label>
-      <input class="form-input" id="editMobile"   value="${s.mobile || ''}" type="tel"/>
-    </div>
-    <div class="form-group">
-      <label class="form-label">City / State</label>
-      <input class="form-input" id="editCity"     value="${s.city   || ''}"/>
-    </div>
-    <div class="form-group">
-      <label class="form-label">Course</label>
-      <select class="form-select" id="editCourse">${courseOptions}</select>
-    </div>
-    <div class="form-group">
-      <label class="form-label">Plan</label>
-      <select class="form-select" id="editPlan">${planOptions}</select>
-    </div>
-    <div class="form-group">
-      <label class="form-label">Fee Paid</label>
-      <input class="form-input" id="editFee"      value="${s.fee    || ''}"/>
-    </div>
-    <div class="form-group">
-      <label class="form-label">Progress (0 – 100)</label>
+    <div class="form-group"><label class="form-label">Full Name</label>
+      <input class="form-input" id="editName"     value="${s.Name   ||''}"/></div>
+    <div class="form-group"><label class="form-label">Email</label>
+      <input class="form-input" id="editEmail"    value="${s.Email  ||''}" type="email"/></div>
+    <div class="form-group"><label class="form-label">Mobile</label>
+      <input class="form-input" id="editMobile"   value="${s.Mobile ||''}" type="tel"/></div>
+    <div class="form-group"><label class="form-label">City / State</label>
+      <input class="form-input" id="editCity"     value="${s.City   ||''}"/></div>
+    <div class="form-group"><label class="form-label">Course</label>
+      <select class="form-select" id="editCourse">${courseOpts}</select></div>
+    <div class="form-group"><label class="form-label">Plan</label>
+      <select class="form-select" id="editPlan">${planOpts}</select></div>
+    <div class="form-group"><label class="form-label">Fee Paid</label>
+      <input class="form-input" id="editFee"      value="${s.Fee||s['Fee Paid']||''}"/></div>
+    <div class="form-group"><label class="form-label">Progress (0–100)</label>
       <input class="form-input" id="editProgress" type="number" min="0" max="100"
-             value="${parseInt(s.progress) || 0}"/>
-    </div>
-    <div class="form-group">
-      <label class="form-label">Status</label>
+             value="${parseInt(s.Progress)||0}"/></div>
+    <div class="form-group"><label class="form-label">Status</label>
       <div class="edit-status-btns">
-        <div class="edit-status-btn esb-active${s.status === 'active'    ? ' selected' : ''}"
+        <div class="edit-status-btn esb-active${status==='active'?' selected':''}"
              onclick="pickStatus(this,'active')">✅ Active</div>
-        <div class="edit-status-btn esb-pending${s.status === 'pending'  ? ' selected' : ''}"
+        <div class="edit-status-btn esb-pending${status==='pending'?' selected':''}"
              onclick="pickStatus(this,'pending')">⏳ Pending</div>
-        <div class="edit-status-btn esb-inactive${s.status === 'inactive'? ' selected' : ''}"
+        <div class="edit-status-btn esb-inactive${status==='inactive'?' selected':''}"
              onclick="pickStatus(this,'inactive')">🚫 Inactive</div>
       </div>
-      <input type="hidden" id="editStatusVal" value="${s.status}"/>
+      <input type="hidden" id="editStatusVal" value="${status}"/>
     </div>
-
     <button class="btn-primary" style="width:100%;margin-top:0.6rem;padding:0.75rem"
-            onclick="saveEdit()">💾 Save Changes</button>
+            onclick="saveEdit()">💾 Save to Google Sheet</button>
     <div id="editAlert" class="alert" style="margin-top:0.8rem"></div>`;
-
   openModal('editModal');
 }
 
 function pickStatus(el, val) {
-  document.querySelectorAll('.edit-status-btn').forEach(b => b.classList.remove('selected'));
+  document.querySelectorAll('.edit-status-btn').forEach(b=>b.classList.remove('selected'));
   el.classList.add('selected');
-  const hidden = document.getElementById('editStatusVal');
-  if (hidden) hidden.value = val;
+  const h = document.getElementById('editStatusVal');
+  if (h) h.value = val;
 }
 
-function saveEdit() {
-  const name     = (document.getElementById('editName')        || {}).value?.trim() || '';
-  const email    = (document.getElementById('editEmail')       || {}).value?.trim() || '';
-  const mobile   = (document.getElementById('editMobile')      || {}).value?.trim() || '';
-  const city     = (document.getElementById('editCity')        || {}).value?.trim() || '';
-  const course   = (document.getElementById('editCourse')      || {}).value || '';
-  const plan     = (document.getElementById('editPlan')        || {}).value || '';
-  const fee      = (document.getElementById('editFee')         || {}).value?.trim() || '';
-  const progRaw  = parseInt((document.getElementById('editProgress') || {}).value) || 0;
-  const status   = (document.getElementById('editStatusVal')   || {}).value || 'active';
+async function saveEdit() {
+  const name    = (document.getElementById('editName')       ||{}).value?.trim()||'';
+  const email   = (document.getElementById('editEmail')      ||{}).value?.trim()||'';
+  const mobile  = (document.getElementById('editMobile')     ||{}).value?.trim()||'';
+  const city    = (document.getElementById('editCity')       ||{}).value?.trim()||'';
+  const course  = (document.getElementById('editCourse')     ||{}).value||'';
+  const plan    = (document.getElementById('editPlan')       ||{}).value||'';
+  const fee     = (document.getElementById('editFee')        ||{}).value?.trim()||'';
+  const prog    = parseInt((document.getElementById('editProgress')||{}).value)||0;
+  const status  = (document.getElementById('editStatusVal')  ||{}).value||'active';
 
   if (!name) { showModalAlert('editAlert','⚠ Full Name is required.','error'); return; }
-  if (progRaw < 0 || progRaw > 100) { showModalAlert('editAlert','⚠ Progress must be 0–100.','error'); return; }
+  if (prog < 0 || prog > 100) { showModalAlert('editAlert','⚠ Progress must be 0–100.','error'); return; }
 
-  const idx = allStudents.findIndex(r => r.id === editingId);
-  if (idx === -1) return;
-
-  allStudents[idx] = { ...allStudents[idx], name, email, mobile, city, course, plan, fee, progress: String(progRaw), status };
-  persistStudents(allStudents);
-  closeModal('editModal');
-  filterTable();
-  showToast(`✅ "${name}" updated successfully!`, 'success');
+  showLoading('Saving changes to Google Sheet...');
+  try {
+    const result = await sheetPost({
+      action: 'update',
+      student: {
+        ID: editingId, Name: name, Email: email, Mobile: mobile,
+        City: city, Course: course, Plan: plan, Fee: fee,
+        Progress: String(prog), Status: status
+      }
+    });
+    if (result.success) {
+      closeModal('editModal');
+      await loadFromSheet();
+      showToast(`✅ "${name}" updated in Google Sheet!`, 'success');
+    } else {
+      showModalAlert('editAlert','❌ Update failed: ' + (result.message||'Unknown error'),'error');
+    }
+  } catch(err) {
+    showModalAlert('editAlert','❌ Network error: ' + err.message,'error');
+  }
+  hideLoading();
 }
 
 /* ============================================================
    ADD STUDENT
 ============================================================ */
 function autoFillFee() {
-  const planEl = document.getElementById('addPlan');
-  const durEl  = document.getElementById('addDuration');
-  const feeEl  = document.getElementById('addFee');
-  if (!planEl || !durEl || !feeEl) return;
-  const monthly = PLAN_FEES[planEl.value] || 0;
-  const dur     = parseInt(durEl.value)   || 1;
-  feeEl.value   = '₹' + (monthly * dur).toLocaleString('en-IN');
+  const plan = (document.getElementById('addPlan')    ||{}).value||'';
+  const dur  = parseInt((document.getElementById('addDuration')||{}).value)||1;
+  const el   = document.getElementById('addFee');
+  if (el) el.value = '₹' + ((PLAN_FEES[plan]||0)*dur).toLocaleString('en-IN');
 }
 
-function addStudent() {
-  const name   = (document.getElementById('addName')   || {}).value?.trim() || '';
-  const email  = (document.getElementById('addEmail')  || {}).value?.trim() || '';
-  const mobile = (document.getElementById('addMobile') || {}).value?.trim() || '';
-  const city   = (document.getElementById('addCity')   || {}).value?.trim() || '';
-  const course = (document.getElementById('addCourse') || {}).value || '';
-  const plan   = (document.getElementById('addPlan')   || {}).value || 'Starter';
-  const dur    = (document.getElementById('addDuration')|| {}).value || '1';
-  const fee    = (document.getElementById('addFee')    || {}).value?.trim() || '';
-  const status = (document.getElementById('addStatus') || {}).value || 'pending';
+async function addStudent() {
+  const name   = (document.getElementById('addName')   ||{}).value?.trim()||'';
+  const email  = (document.getElementById('addEmail')  ||{}).value?.trim()||'';
+  const mobile = (document.getElementById('addMobile') ||{}).value?.trim()||'';
+  const city   = (document.getElementById('addCity')   ||{}).value?.trim()||'';
+  const course = (document.getElementById('addCourse') ||{}).value||'';
+  const plan   = (document.getElementById('addPlan')   ||{}).value||'Starter';
+  const dur    = (document.getElementById('addDuration')||{}).value||'1';
+  const fee    = (document.getElementById('addFee')    ||{}).value?.trim()||'';
+  const status = (document.getElementById('addStatus') ||{}).value||'pending';
 
-  /* ---- Validation ---- */
-  if (!name)  { showModalAlert('addAlert', '⚠ Full Name is required.',         'error'); return; }
-  if (!email) { showModalAlert('addAlert', '⚠ Email Address is required.',     'error'); return; }
-  if (!fee)   { showModalAlert('addAlert', '⚠ Fee Paid is required.',          'error'); return; }
-
-  const emailRx = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  if (!emailRx.test(email)) {
-    showModalAlert('addAlert', '⚠ Please enter a valid email address.', 'error'); return;
+  if (!name)  { showModalAlert('addAlert','⚠ Full Name is required.','error'); return; }
+  if (!email) { showModalAlert('addAlert','⚠ Email Address is required.','error'); return; }
+  if (!fee)   { showModalAlert('addAlert','⚠ Fee Paid is required.','error'); return; }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    showModalAlert('addAlert','⚠ Please enter a valid email address.','error'); return;
+  }
+  const dup = allStudents.find(s => (s.Email||'').toLowerCase() === email.toLowerCase());
+  if (dup) {
+    showModalAlert('addAlert',`⚠ Email already exists (ID: ${dup.ID}).`,'error'); return;
   }
 
-  const duplicate = allStudents.find(
-    s => s.email && s.email.toLowerCase() === email.toLowerCase()
-  );
-  if (duplicate) {
-    showModalAlert('addAlert',
-      `⚠ Email already exists (ID: ${duplicate.id}). Use a different email.`, 'error');
-    return;
+  const newId = 'LF-' + new Date().getFullYear() + '-' +
+    String(Math.floor(Math.random()*9000)+1000);
+  const today = new Date().toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'});
+
+  showLoading('Saving new student to Google Sheet...');
+  try {
+    const result = await sheetPost({
+      action: 'add',
+      student: {
+        ID: newId, Name: name, Email: email, Mobile: mobile,
+        City: city, Course: course, Plan: plan,
+        Duration: dur, Fee: fee, Date: today,
+        Progress: '0', Status: status
+      }
+    });
+    if (result.success) {
+      showModalAlert('addAlert',`✅ Saved! Student ID: ${newId}`,'success');
+      showToast(`✅ ${name} added — ID: ${newId}`, 'success');
+      await loadFromSheet();
+      setTimeout(() => { closeModal('addModal'); clearAddForm(); }, 1800);
+    } else {
+      showModalAlert('addAlert','❌ Save failed: '+(result.message||'Unknown error'),'error');
+    }
+  } catch(err) {
+    showModalAlert('addAlert','❌ Network error: '+err.message,'error');
   }
-
-  /* ---- Build new record ---- */
-  const newStudent = {
-    id:       genStudentId(),
-    name,
-    email,
-    mobile,
-    city,
-    course,
-    plan,
-    duration: dur,
-    fee,
-    date:     new Date().toLocaleDateString('en-IN', {
-                day: 'numeric', month: 'short', year: 'numeric' }),
-    progress: '0',
-    status,
-  };
-
-  /* ---- Save ---- */
-  allStudents.unshift(newStudent);           // add to top of array
-  persistStudents(allStudents);              // write to localStorage
-  currentPage = 1;
-  filterTable();                             // refresh table + charts
-
-  showModalAlert('addAlert',
-    `✅ Saved! Student ID: ${newStudent.id}`, 'success');
-  showToast(`✅ ${name} added — ID: ${newStudent.id}`, 'success');
-
-  /* close modal & clear form after a short delay */
-  setTimeout(() => {
-    closeModal('addModal');
-    clearAddForm();
-  }, 1800);
+  hideLoading();
 }
 
 function clearAddForm() {
-  ['addName','addEmail','addMobile','addCity','addFee'].forEach(id => {
-    const el = document.getElementById(id);
-    if (el) el.value = '';
+  ['addName','addEmail','addMobile','addCity','addFee'].forEach(id=>{
+    const el=document.getElementById(id); if(el) el.value='';
   });
-  const sel = document.getElementById('addStatus');
-  if (sel) sel.value = 'pending';
-  const alrt = document.getElementById('addAlert');
-  if (alrt) { alrt.textContent = ''; alrt.className = 'alert'; }
+  const s=document.getElementById('addStatus'); if(s) s.value='pending';
+  const a=document.getElementById('addAlert');  if(a){a.textContent='';a.className='alert';}
   autoFillFee();
 }
 
 /* ============================================================
    DELETE STUDENT
 ============================================================ */
-function deleteStudent(id) {
-  const s = allStudents.find(r => r.id === id);
+async function deleteStudent(id) {
+  const s = allStudents.find(r => r.ID === id);
   if (!s) return;
-  const ok = confirm(
-    `Remove "${s.name}" (${s.id}) from the database?\n\nThis cannot be undone.`
-  );
-  if (!ok) return;
-  allStudents = allStudents.filter(r => r.id !== id);
-  persistStudents(allStudents);
-  if (currentPage > Math.ceil(allStudents.length / PER_PAGE) && currentPage > 1) currentPage--;
-  filterTable();
-  showToast(`🗑 "${s.name}" removed from database.`, 'info');
-}
-
-/* ============================================================
-   RESET TO DEFAULTS
-============================================================ */
-function confirmReset() {
-  const ok = confirm(
-    'Reset ALL data to the default sample students?\n\n' +
-    'All manually added or edited records will be LOST.'
-  );
-  if (!ok) return;
-  allStudents = JSON.parse(JSON.stringify(DEFAULT_STUDENTS));
-  persistStudents(allStudents);
-  currentPage = 1;
-  clearFilters();
-  showToast('↺ Data reset to defaults.', 'info');
+  if (!confirm(`Remove "${s.Name}" (${s.ID}) from Google Sheet?\n\nThis cannot be undone.`)) return;
+  showLoading('Deleting from Google Sheet...');
+  try {
+    const result = await sheetPost({ action:'delete', id });
+    if (result.success) {
+      await loadFromSheet();
+      showToast(`🗑 "${s.Name}" removed from Google Sheet.`,'info');
+    } else {
+      showToast('❌ Delete failed: '+(result.message||'Unknown error'),'error');
+    }
+  } catch(err) {
+    showToast('❌ Network error: '+err.message,'error');
+  }
+  hideLoading();
 }
 
 /* ============================================================
    EXPORT CSV
 ============================================================ */
 function exportCSV() {
-  const headers = [
-    'Student ID','Name','Email','Mobile','City',
-    'Course','Plan','Duration (mo)','Fee Paid',
-    'Enrolled Date','Progress (%)','Status'
-  ];
+  const headers = ['ID','Name','Email','Mobile','City','Course','Plan','Duration','Fee','Date','Progress','Status'];
   const rows = allStudents.map(r =>
-    [r.id, r.name, r.email||'', r.mobile||'', r.city||'',
-     r.course, r.plan, r.duration||'', r.fee,
-     r.date, r.progress||'0', r.status]
-    .map(v => `"${String(v).replace(/"/g,'""')}"`)
-    .join(',')
+    headers.map(h => `"${String(r[h]||'').replace(/"/g,'""')}"`).join(',')
   );
-
   const csv  = [headers.join(','), ...rows].join('\r\n');
-  const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+  const blob = new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8;'});
   const url  = URL.createObjectURL(blob);
   const a    = document.createElement('a');
-  a.href     = url;
-  a.download = 'LearningFuture_Students_' + new Date().toISOString().slice(0, 10) + '.csv';
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
-  showToast('⬇ CSV exported — check your Downloads folder.', 'success');
+  a.href=url; a.download='LearningFuture_Students_'+new Date().toISOString().slice(0,10)+'.csv';
+  document.body.appendChild(a); a.click();
+  document.body.removeChild(a); URL.revokeObjectURL(url);
+  showToast('⬇ CSV exported successfully!','success');
 }
 
 /* ============================================================
    MODAL HELPERS
 ============================================================ */
-function openModal(id)  { const el = document.getElementById(id); if (el) el.classList.add('open'); }
-function closeModal(id) { const el = document.getElementById(id); if (el) el.classList.remove('open'); }
+function openModal(id)  { const el=document.getElementById(id); if(el) el.classList.add('open'); }
+function closeModal(id) { const el=document.getElementById(id); if(el) el.classList.remove('open'); }
 
-// Click outside modal box → close
-document.querySelectorAll('.modal-overlay').forEach(overlay => {
-  overlay.addEventListener('click', function (e) {
-    if (e.target === this) this.classList.remove('open');
-  });
+document.querySelectorAll('.modal-overlay').forEach(o => {
+  o.addEventListener('click', function(e){ if(e.target===this) this.classList.remove('open'); });
 });
-
-// Escape key → close all modals
 document.addEventListener('keydown', e => {
-  if (e.key === 'Escape')
-    document.querySelectorAll('.modal-overlay.open')
-            .forEach(m => m.classList.remove('open'));
+  if(e.key==='Escape')
+    document.querySelectorAll('.modal-overlay.open').forEach(m=>m.classList.remove('open'));
 });
 
-function openAddModal() {
-  clearAddForm();
-  autoFillFee();
-  openModal('addModal');
-}
+function openAddModal() { clearAddForm(); autoFillFee(); openModal('addModal'); }
 
 /* ============================================================
-   ALERTS (inside modals)
+   ALERT + TOAST
 ============================================================ */
 function showModalAlert(id, msg, type) {
-  const el = document.getElementById(id);
-  if (!el) return;
-  el.textContent = msg;
-  el.className   = `alert alert-${type} show`;
-  setTimeout(() => { if (el) el.classList.remove('show'); }, 5000);
+  const el=document.getElementById(id); if(!el) return;
+  el.textContent=msg; el.className=`alert alert-${type} show`;
+  setTimeout(()=>{ if(el) el.classList.remove('show'); },5000);
 }
 
-/* ============================================================
-   TOAST NOTIFICATION
-============================================================ */
 function showToast(msg, type) {
-  const toast   = document.getElementById('toast');
-  if (!toast) return;
-  toast.textContent = msg;
-  toast.className   = `toast toast-${type} show`;
-  if (toastTimer) clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => toast.classList.remove('show'), 3500);
+  const t=document.getElementById('toast'); if(!t) return;
+  t.textContent=msg; t.className=`toast toast-${type} show`;
+  if(toastTimer) clearTimeout(toastTimer);
+  toastTimer=setTimeout(()=>t.classList.remove('show'),3500);
 }
 
 /* ============================================================
-   GENERATE STUDENT ID  (shared from main.js but also local)
+   INIT — load data on page open
 ============================================================ */
-function genStudentId() {
-  return 'LF-' + new Date().getFullYear() + '-' +
-    String(Math.floor(Math.random() * 9000) + 1000);
-}
-
-/* ============================================================
-   INIT
-============================================================ */
-allStudents = loadStudents();
-filterTable();
+window.addEventListener('DOMContentLoaded', () => {
+  loadFromSheet();
+});
 
 </script>
 </body>
